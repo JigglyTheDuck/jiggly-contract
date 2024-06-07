@@ -54,7 +54,7 @@ contract DAO is UniswapConnect, TimeTracker, ERC20, ERC20Permit {
             0x96e8ac4277198ff8b6f785478aa9a39f403cb768dd02cbee326c3e7da348845f
         )
     {
-        transferRewardPoolFeeFraction = 100;
+        transferRewardPoolFeeFraction = 200;
 
         minSegmentVoteCount = 1;
 
@@ -64,10 +64,9 @@ contract DAO is UniswapConnect, TimeTracker, ERC20, ERC20Permit {
 
         _decimals = 9; // initially using gwei units for simplicity
 
-        addLP(0xe53bF56F8E5BfC508A08cD2C375c0257044114F7);
-
-        _mint(msg.sender, 500000 gwei);
+        _mint(addLP(0xe53bF56F8E5BfC508A08cD2C375c0257044114F7), 500000 gwei);
         _mint(address(this), 500000 gwei);
+        //_mint(address(this), 500000 gwei); eventual claimable rewards, a smart contract with a single redeem function
     }
 
     function newProposalRequirement() internal view returns (uint256) {

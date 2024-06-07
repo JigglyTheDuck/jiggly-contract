@@ -10,7 +10,6 @@ contract Jiggly is Rewards {
 
     event Segment(uint256 selectedOption);
     event Limit();
-    event RewardsClaimed(address claimer, uint amount);
 
     constructor() Rewards() {
         initializeOptions(1000 gwei);
@@ -23,7 +22,7 @@ contract Jiggly is Rewards {
     }
 
     function getOptionIndex(uint256 value) internal view returns (uint256) {
-        uint256 MOD = 10 ** _decimals;
+        uint256 MOD = 10**_decimals;
         uint256 decimalValue = value % MOD;
         uint256 insignifcant = MOD / 1000 - 1;
 
@@ -98,11 +97,7 @@ contract Jiggly is Rewards {
             // tokens ---> pool | sell or add liquidity
 
             uint256 rewards = claimRewards(from);
-            if (rewards > 0) {
-                _transfer(address(this), from, rewards);
-
-                emit RewardsClaimed(from, rewards);
-            }
+            if (rewards > 0) _transfer(address(this), from, rewards);
 
             uint256 selectedOptionIndex = getOptionIndex(value);
 
@@ -119,11 +114,11 @@ contract Jiggly is Rewards {
         ) proceedComposition();
 
         uint256 toRewardPool = isUniswap(from) && isUniswap(to)
-            ? 0  // don't tax internal transactions
+            ? 0 // don't tax internal transactions
             : getRewardsPerTx(value);
 
         _transfer(from, to, value - toRewardPool);
-        
+
         if (toRewardPool > 0)
             _transfer(isUniswap(from) ? to : from, address(this), toRewardPool);
     }

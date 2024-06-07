@@ -25,9 +25,6 @@ contract Rewards is DAO {
     ) internal {
         contributionVolumes[optionIndex] += value;
 
-        // this current system only allows single contributions/segment, which is probably fine
-        // add as much as you think is good
-
         contributions[from] = Contribution(
             uint160(value),
             uint64(lastTimestamp),
@@ -50,7 +47,7 @@ contract Rewards is DAO {
 
         rewardPoolFeeFraction = rewardPoolFeeFraction == 0 ? 1 : rewardPoolFeeFraction;
         
-        uint256 maxPoolSize = balanceOf(address(this)) / rewardPoolFeeFraction;
+        uint256 maxPoolSize = balanceOf(address(this));
         
         segmentPoolSize = previousContributionsVolume / rewardPoolFeeFraction > maxPoolSize ? maxPoolSize : previousContributionsVolume / rewardPoolFeeFraction;
 
