@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "./DAO.sol";
+import "./TimeTracker.sol";
+import "./WithComposer.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 
-contract Rewards is DAO {
+contract Rewards is WithComposer, TimeTracker, ERC20, ERC20Permit {
     struct Contribution {
         uint160 value;
         uint64 lastTimestamp;
@@ -12,11 +15,25 @@ contract Rewards is DAO {
 
     // to incentivize agreement
     uint256 public segmentPoolSize; // public as ongoing transactions may affect actual balance
+
     uint256 previousContributionsVolume;
-    uint previousOption;
+
+    uint256 previousOption;
+
     uint256[64] contributionVolumes;
 
+    uint256 transferRewardPoolFeeFraction;
+
     mapping(address => Contribution) public contributions;
+
+    constructor(
+        string memory name,
+        string memory symbol,
+        uint64 initialSegmentLength,
+        uint256 initialRewardPoolFeeFraction
+    ) ERC20(name, symbol) ERC20Permit(name) TimeTracker(initialSegmentLength) {
+        transferRewardPoolFeeFraction = initialRewardPoolFeeFraction;
+    }
 
     function addContribution(
         address from,
@@ -33,10 +50,17 @@ contract Rewards is DAO {
     }
 
     function getNextOptions() internal view returns (uint256) {
-        return Composer(composerAddress).getNextOptions();
+        return composer.getNextOptions();
     }
 
-    function resetSegmentRewards(uint selectedOption) internal returns (uint256) {
+    function getRewardsPerTx(uint256 value) internal view returns (uint256) {
+        return value / transferRewardPoolFeeFraction;
+    }
+
+    function resetSegmentRewards(uint256 selectedOption)
+        internal
+        returns (uint256)
+    {
         previousContributionsVolume = contributionVolumes[selectedOption];
         uint256 optionsLength = getNextOptions();
 
@@ -45,11 +69,16 @@ contract Rewards is DAO {
 
         uint256 rewardPoolFeeFraction = transferRewardPoolFeeFraction / 5; // 5x the tax
 
-        rewardPoolFeeFraction = rewardPoolFeeFraction == 0 ? 1 : rewardPoolFeeFraction;
-        
+        rewardPoolFeeFraction = rewardPoolFeeFraction == 0
+            ? 1
+            : rewardPoolFeeFraction;
+
         uint256 maxPoolSize = balanceOf(address(this));
-        
-        segmentPoolSize = previousContributionsVolume / rewardPoolFeeFraction > maxPoolSize ? maxPoolSize : previousContributionsVolume / rewardPoolFeeFraction;
+
+        segmentPoolSize = previousContributionsVolume / rewardPoolFeeFraction >
+            maxPoolSize
+            ? maxPoolSize
+            : previousContributionsVolume / rewardPoolFeeFraction;
 
         previousOption = selectedOption;
 
@@ -75,4 +104,3 @@ contract Rewards is DAO {
         return rewards;
     }
 }
-

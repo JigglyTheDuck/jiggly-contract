@@ -3,17 +3,50 @@ pragma solidity ^0.8.20;
 
 import "./Composer.sol";
 import "./Rewards.sol";
+import "./Approver.sol";
+import "./UniswapConnect.sol";
+import "./DAO.sol";
 
-contract Jiggly is Rewards {
+contract Jiggly is Rewards, UniswapConnect {
     uint256[64] public optionVotes;
     uint16 public segmentVoteCount = 0;
+
+    address dao;
+
+    uint16 minSegmentVoteCount;
+
+    uint8 _decimals;
 
     event Segment(uint256 selectedOption);
     event Limit();
 
-    constructor() Rewards() {
+    constructor()
+        Rewards("Jiggly", "GLY", 30 minutes, 200)
+        UniswapConnect(
+            0x9e5A52f57b3038F1B8EeE45F28b3C1967e22799C,
+            0xedf6066a2b290C185783862C7F4776A2C8077AD1,
+            0xec7BE89e9d109e7e3Fec59c222CF297125FEFda2,
+            0x96e8ac4277198ff8b6f785478aa9a39f403cb768dd02cbee326c3e7da348845f
+        )
+    {
+        _decimals = 9; // initially using gwei units for simplicity
+
+        minSegmentVoteCount = 1;
+
+        addLP(0xe53bF56F8E5BfC508A08cD2C375c0257044114F7);
+
+        dao = address(new DAO());
+
         initializeOptions(1000 gwei);
 
+        _mint(address(this), 250000 gwei);
+
+        _mint(msg.sender, 250000 gwei - 1);
+
+        // for discoverability.
+        _mint(dao, 1);
+
+        //_mint(address(this), 500000 gwei); eventual claimable rewards, a smart contract with a single redeem function
         emit Limit();
     }
 
@@ -64,7 +97,7 @@ contract Jiggly is Rewards {
 
         emit Segment(maxIndex);
 
-        if (Composer(composerAddress).applyOption(maxIndex)) {
+        if (composer.applyOption(maxIndex)) {
             emit Limit();
 
             activatePendingComposer();
@@ -123,6 +156,34 @@ contract Jiggly is Rewards {
             _transfer(isUniswap(from) ? to : from, address(this), toRewardPool);
     }
 
+    function passProposal(_Proposals.Proposals proposal, address target) external {
+        require(msg.sender == dao);
+
+        if (proposal == _Proposals.Proposals.NEW_LP) {
+            addLP(target);
+        } else if (proposal == _Proposals.Proposals.REMOVE_LP) {
+            removeLP(target);
+        } else if (proposal == _Proposals.Proposals.CHANGE_ROUTER) {
+            usRouter1 = target;
+        } else if (proposal == _Proposals.Proposals.CHANGE_DAO) {
+            dao = target;
+        } else if (proposal == _Proposals.Proposals.NEW_COMPOSER) {
+            pendingComposerAddress = target;
+        } else if (proposal == _Proposals.Proposals.CHANGE_FEE) {
+            transferRewardPoolFeeFraction = target == address(1) && transferRewardPoolFeeFraction > 25
+                ? transferRewardPoolFeeFraction / 2
+                : transferRewardPoolFeeFraction * 2;
+        } else if (proposal == _Proposals.Proposals.ADJUST_DECIMALS) {
+            _decimals = target == address(1) && _decimals > 3
+                ? _decimals - 1
+                : _decimals + 1;
+        } else if (proposal == _Proposals.Proposals.CHANGE_SEGMENT_LENGTH) {
+            changeSegmentLength(uint64(uint160(target)));
+        } else if (proposal == _Proposals.Proposals.CHANGE_MIN_SEGMENT_VOTE) {
+            minSegmentVoteCount = uint16(uint160(target));
+        }
+    }
+
     // -- ERC 20 function overrides --
 
     /**
@@ -141,11 +202,11 @@ contract Jiggly is Rewards {
      * - the caller must have allowance for ``from``'s tokens of at least
      * `value`.
      */
-    function transferFrom(
+    function transferFrom2(
         address from,
         address to,
         uint256 value
-    ) public override returns (bool) {
+    ) public returns (bool) {
         address spender = _msgSender();
         _spendAllowance(from, spender, value);
         composeAndTransfer(from, to, value);
@@ -160,14 +221,9 @@ contract Jiggly is Rewards {
      * - `to` cannot be the zero address.
      * - the caller must have a balance of at least `value`.
      */
-    function transfer(address to, uint256 value)
-        public
-        override
-        returns (bool)
-    {
+    function transfer2(address to, uint256 value) public returns (bool) {
         address owner = _msgSender();
         composeAndTransfer(owner, to, value);
         return true;
     }
 }
-
