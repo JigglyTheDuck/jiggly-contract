@@ -18,3 +18,4 @@ contract TimeTracker {
         lastTimestamp += segmentLength;
     }
 }
+

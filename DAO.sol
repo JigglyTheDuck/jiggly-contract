@@ -2,8 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "./IWithDAO.sol";
-import "./_Proposals.sol";
+import "./IJiggly.sol";
 
 contract DAO {
     uint256 constant THRESHOLD_FRACTION = 15; // 1 / 15th of total supply is required for a proposal to pass
@@ -17,14 +16,14 @@ contract DAO {
     }
 
     struct Proposal {
-        _Proposals.Proposals proposal;
+        uint8 proposal;
         uint256 voteCount;
     }
 
     mapping(address => Proposal) public proposals;
     mapping(address => Voter) votes;
 
-    event ProposalPassed(_Proposals.Proposals proposal, address target);
+    event ProposalPassed(uint8, address target);
 
     constructor() {
         owner = msg.sender;
@@ -34,11 +33,9 @@ contract DAO {
         return IERC20(owner).totalSupply() / (THRESHOLD_FRACTION * 100); // requiring 1% of pass to initiate a vote
     }
 
-    function createProposal(address target, _Proposals.Proposals _proposal)
-        external
-    {
+    function createProposal(address target, uint8 _proposal) external {
         Proposal storage proposal = proposals[target];
-        require(proposal.proposal == _Proposals.Proposals.EMPTY);
+        require(proposal.proposal == 0);
 
         proposal.proposal = _proposal;
         proposal.voteCount = 0;
@@ -49,10 +46,12 @@ contract DAO {
     function hasPassed(Proposal memory proposal) internal view returns (bool) {
         return
             proposal.voteCount >
-            IERC20(owner).totalSupply() / THRESHOLD_FRACTION &&
-            (proposal.proposal != _Proposals.Proposals.CHANGE_DAO ||
-                proposal.voteCount >
-                IERC20(owner).totalSupply() / (THRESHOLD_FRACTION / 5));
+            IERC20(owner).totalSupply() /
+                (
+                    proposal.proposal < 3 // Major changes require more votes
+                        ? THRESHOLD_FRACTION / 3
+                        : THRESHOLD_FRACTION
+                );
     }
 
     function vote(address target, uint256 amount) public {
@@ -63,11 +62,11 @@ contract DAO {
 
         Voter storage voter = votes[msg.sender];
 
-        require(proposal.proposal != _Proposals.Proposals.EMPTY);
+        require(proposal.proposal != 0);
 
         require(voter.lockedAmount == 0);
 
-        // requires external approval. 
+        // requires external approval.
         IERC20(owner).transferFrom(msg.sender, address(this), amount);
 
         proposal.voteCount += amount;
@@ -76,9 +75,9 @@ contract DAO {
         voter.timestamp = uint64(block.timestamp);
 
         if (hasPassed(proposal)) {
-            IWithDAO(owner).passProposal(proposal.proposal, target);
+            IJiggly(owner).passProposal(proposal.proposal, target);
             emit ProposalPassed(proposal.proposal, target);
-            proposal.proposal = _Proposals.Proposals.EMPTY;
+            proposal.proposal = 0;
             proposal.voteCount = 0;
         }
     }

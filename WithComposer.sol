@@ -25,3 +25,4 @@ contract WithComposer {
         pendingComposerAddress = composerAddress;
     }
 }
+
