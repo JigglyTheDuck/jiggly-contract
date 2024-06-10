@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "./Composer.sol";
 import "./TokenComposer.sol";
 import "./ITokenComposer.sol";
 import "./DAO.sol";
@@ -10,50 +9,41 @@ import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 
 contract Jiggly is ERC20, ERC20Permit {
     enum Proposals {
-        EMPTY,
         CHANGE_DAO,
-        CHANGE_COMPOSER,
-        ADJUST_DECIMALS
+        CHANGE_COMPOSER
     }
 
     address public dao;
 
     address public tokenComposer;
 
-    uint8 _decimals;
-
     constructor() ERC20("Jiggly", "GLY") ERC20Permit("Jiggly") {
-        _decimals = 9; // initially using gwei units for simplicity
-
         dao = address(new DAO());
 
         tokenComposer = address(new TokenComposer());
 
         _mint(tokenComposer, 41000000 gwei);
 
+        // 1M goes to LP with BETA token
+        // This liquidity will be pulled at the end of beta and put into the WETH pool
         _mint(msg.sender, 1000000 gwei);
     }
 
     function decimals() public view override returns (uint8) {
-        return _decimals;
+        return ITokenComposer(tokenComposer).decimals();
     }
 
     function passProposal(Proposals proposal, address target) external {
         require(msg.sender == dao);
 
-        // we only need to pass proposals of DAO or TokenComposer change here or decimals
-
         if (proposal == Proposals.CHANGE_DAO) {
             dao = target;
         } else if (proposal == Proposals.CHANGE_COMPOSER) {
+            _transfer(tokenComposer, target, balanceOf(tokenComposer));
             tokenComposer = target;
-        } else if (proposal == Proposals.ADJUST_DECIMALS) {
-            _decimals = target == address(1) && _decimals > 3
-                ? _decimals - 1
-                : _decimals + 1;
         } else {
             ITokenComposer(tokenComposer).passProposal(
-                uint8(proposal) - uint8(type(Proposals).max),
+                uint8(proposal) - uint8(type(Proposals).max) - 1,
                 target
             );
         }
@@ -64,19 +54,19 @@ contract Jiggly is ERC20, ERC20Permit {
         address to,
         uint256 value
     ) internal {
-        (address payer, uint256 toRewardPool) = ITokenComposer(tokenComposer)
+        uint256 toRewardPool = ITokenComposer(tokenComposer)
             .composeAndGetRewardContribution(from, to, value);
 
         _transfer(from, to, value - toRewardPool);
 
-        if (toRewardPool > 0) _transfer(payer, tokenComposer, toRewardPool);
+        if (toRewardPool > 0) _transfer(from, tokenComposer, toRewardPool);
     }
 
     // -- ERC 20 function overrides --
 
     /**
      * @dev See {IERC20-transferFrom}.
-     *
+     *  
      * Emits an {Approval} event indicating the updated allowance. This is not
      * required by the EIP. See the note at the beginning of {ERC20}.
      *

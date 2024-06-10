@@ -7,9 +7,11 @@ import "./IJiggly.sol";
 import "./UniswapConnect.sol";
 
 contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
+
     address token;
 
     enum Proposals {
+        ADJUST_DECIMALS,
         NEW_COMPOSER,
         NEW_LP,
         REMOVE_LP,
@@ -25,11 +27,9 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
         uint8 optionIndex;
     }
 
-    uint256[64] public optionVotes;
+    uint8 _decimals;
 
-    // variables used for initial rewards
-    uint16 initialRewardClaims;
-    mapping (address => bool) claimedInitialRewards;
+    uint256[64] public optionVotes;
 
     uint16 public segmentVoteCount = 0;
 
@@ -51,31 +51,42 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
 
     mapping(address => Contribution) public contributions;
 
+    address constant BETA_TOKEN = 0xe53bF56F8E5BfC508A08cD2C375c0257044114F7; // BETA token
+    address constant LIVE_TOKEN = 0x4200000000000000000000000000000000000006; // WETH
+
     constructor()
         TimeTracker(30 minutes)
         UniswapConnect(
-            0x9e5A52f57b3038F1B8EeE45F28b3C1967e22799C,
-            0xedf6066a2b290C185783862C7F4776A2C8077AD1,
-            0xec7BE89e9d109e7e3Fec59c222CF297125FEFda2,
-            0x96e8ac4277198ff8b6f785478aa9a39f403cb768dd02cbee326c3e7da348845f
+            0x9e5A52f57b3038F1B8EeE45F28b3C1967e22799C, // factory
+            0xedf6066a2b290C185783862C7F4776A2C8077AD1, // router 1
+            0xec7BE89e9d109e7e3Fec59c222CF297125FEFda2, // router 2
+            0x96e8ac4277198ff8b6f785478aa9a39f403cb768dd02cbee326c3e7da348845f // initial hash
         )
     {
+        token = msg.sender;
+
+        _decimals = 9;
+
         minSegmentVoteCount = 1;
 
         initializeOptions(1000 gwei);
 
-        addLP(0xe53bF56F8E5BfC508A08cD2C375c0257044114F7);
+        addLP(BETA_TOKEN);
 
         emit Limit();
 
         transferRewardPoolFeeFraction = 200;
     }
 
+    function decimals() external view returns (uint8) {
+        return _decimals;
+    }
+
     function transfer(address to, uint256 value) internal {
         IERC20(token).transfer(to, value);
     }
 
-   function getOptionIndex(uint256 value) internal view returns (uint256) {
+    function getOptionIndex(uint256 value) internal view returns (uint256) {
         uint256 MOD = 10**IJiggly(token).decimals();
         uint256 decimalValue = value % MOD;
         uint256 insignifcant = MOD / 1000 - 1;
@@ -121,6 +132,11 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
         if (composer.applyOption(maxIndex)) {
             emit Limit();
 
+            if (isUniswapLP(BETA_TOKEN)) {
+                removeLP(BETA_TOKEN);
+                addLP(LIVE_TOKEN);
+            } 
+
             activatePendingComposer();
         }
 
@@ -146,7 +162,7 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
         address from,
         address to,
         uint256 value
-    ) external returns(address, uint) {
+    ) external returns (uint256) {
         require(msg.sender == token);
 
         if (isUniswapLP(to)) {
@@ -169,9 +185,10 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
             segmentVoteCount >= minSegmentVoteCount
         ) proceedComposition();
 
-        return isUniswap(from) && isUniswap(to)
-            ? (address(0), 0) // don't tax internal transactions
-            : (isUniswap(from) ? to : from,  getRewardsPerTx(value));
+        return
+            isUniswap(from) && isUniswap(to)
+                ? 0 // don't tax internal transactions
+                : getRewardsPerTx(value);
     }
 
     function addContribution(
@@ -237,11 +254,9 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
         uint256 rewards = (segmentPoolSize * contribution.value) /
             previousContributionsVolume;
 
-        // first 10000 contributions are rewarded with extra rewards.
-        if (initialRewardClaims < 10000) {
-            rewards *= 5;
-            initialRewardClaims += 1;
-        }
+        // BETA participants are rewarded 10x for all contributions
+        // 5% of contribution volume
+        if (isUniswapLP(BETA_TOKEN)) rewards *= 10;
 
         // reset to avoid reentry
         contribution.value = 0;
@@ -251,17 +266,22 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
 
     function passProposal(Proposals proposal, address target) external {
         require(msg.sender == token);
-        
+
         if (proposal == Proposals.NEW_LP) {
             addLP(target);
         } else if (proposal == Proposals.REMOVE_LP) {
             removeLP(target);
+        } else if (proposal == Proposals.ADJUST_DECIMALS) {
+            _decimals = target == address(1) && _decimals > 3
+                ? _decimals - 1
+                : _decimals + 1;
         } else if (proposal == Proposals.CHANGE_ROUTER) {
             usRouter1 = target;
         } else if (proposal == Proposals.NEW_COMPOSER) {
             pendingComposerAddress = target;
         } else if (proposal == Proposals.CHANGE_FEE) {
-            transferRewardPoolFeeFraction = target == address(1) && transferRewardPoolFeeFraction > 25
+            transferRewardPoolFeeFraction = target == address(1) &&
+                transferRewardPoolFeeFraction > 25
                 ? transferRewardPoolFeeFraction / 2
                 : transferRewardPoolFeeFraction * 2;
         } else if (proposal == Proposals.CHANGE_SEGMENT_LENGTH) {

@@ -36,18 +36,26 @@ contract UniswapConnect {
                 hex"ff",
                 usFactoryAddress,
                 keccak256(abi.encodePacked(token0, token1)),
-                usInitCodeHash // init code hash excluding the bytecode metadata, sourced from the Uniswap V2 core repository
+                usInitCodeHash
             )
         );
         return address(uint160(uint256(hash)));
     }
 
-    function addLP(address tokenAddress) internal {
-        usLPs[getLPAddress(tokenAddress)] = true;
+    function addLP(address tokenAddress) internal returns (address lpAddress) {
+        lpAddress = getLPAddress(tokenAddress);
+
+        usLPs[lpAddress] = true;
+
+        return lpAddress;
     }
 
-    function removeLP(address tokenAddress) internal {
-        usLPs[getLPAddress(tokenAddress)] = false;
+    function removeLP(address tokenAddress) internal returns (address lpAddress) {
+        lpAddress = getLPAddress(tokenAddress);
+
+        usLPs[lpAddress] = false;
+
+        return lpAddress;
     }
 
     function isUniswap(address addr) internal view returns (bool) {

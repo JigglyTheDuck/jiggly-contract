@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./IJiggly.sol";
 
 contract DAO {
-    uint256 constant THRESHOLD_FRACTION = 15; // 1 / 15th of total supply is required for a proposal to pass
+    uint256 constant THRESHOLD_FRACTION = 10; // 10% of total supply is required for a proposal to pass
 
     address owner;
 
@@ -48,8 +48,8 @@ contract DAO {
             proposal.voteCount >
             IERC20(owner).totalSupply() /
                 (
-                    proposal.proposal < 3 // Major changes require more votes
-                        ? THRESHOLD_FRACTION / 3
+                    proposal.proposal < 3 // Major contract changes require more votes and take effect immediately
+                        ? THRESHOLD_FRACTION / 2 // 20% is required for major contract changes
                         : THRESHOLD_FRACTION
                 );
     }
@@ -76,7 +76,7 @@ contract DAO {
 
         if (hasPassed(proposal)) {
             IJiggly(owner).passProposal(proposal.proposal, target);
-            emit ProposalPassed(proposal.proposal, target);
+            emit ProposalPassed(proposal.proposal - 1, target);
             proposal.proposal = 0;
             proposal.voteCount = 0;
         }
