@@ -29,13 +29,15 @@ contract DAO {
     }
 
     function newProposalRequirement() internal view returns (uint256) {
-        return IERC20(owner).totalSupply() / (THRESHOLD_FRACTION * 2/* * 100*/); // requiring 0.1% to initiate a vote
+        return
+            IERC20(owner).totalSupply() /
+            (THRESHOLD_FRACTION * 100); // requiring 0.1% to initiate a vote
     }
 
-    function getBalance() internal view returns(uint256) {
-      return IERC20(owner).balanceOf(address(this));
+    function getBalance() internal view returns (uint256) {
+        return IERC20(owner).balanceOf(address(this));
     }
-    
+
     function createProposal(address target, uint8 _proposal) external {
         Proposal storage proposal = proposals[target];
         require(proposal.proposal == 0);
@@ -59,22 +61,21 @@ contract DAO {
 
     function vote(address target, uint256 amount) public {
         // a single vote must be less than that of the initial requirement
-        require(amount <= newProposalRequirement(), "a");
+        require(amount <= newProposalRequirement());
 
         Proposal storage proposal = proposals[target];
 
         Voter storage voter = votes[msg.sender];
 
-        require(proposal.proposal != 0, "b");
+        require(proposal.proposal != 0);
 
-        require(voter.lockedAmount == 0, "c");
+        require(voter.lockedAmount == 0);
 
         // requires external approval.
-        uint previousBalance = getBalance();
         IERC20(owner).transferFrom(msg.sender, address(this), amount);
 
         proposal.voteCount += amount;
-        voter.lockedAmount = getBalance() - previousBalance;
+        voter.lockedAmount = amount;
         voter.target = target;
         voter.timestamp = uint64(block.timestamp);
 
