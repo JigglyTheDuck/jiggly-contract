@@ -8,8 +8,6 @@ import "./UniswapConnect.sol";
 
 contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
 
-    address token;
-
     enum Proposals {
         ADJUST_DECIMALS, // 3
         NEW_COMPOSER,
@@ -59,14 +57,13 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
     constructor()
         TimeTracker(30 minutes)
         UniswapConnect(
+            msg.sender,
             0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6, // factory
             0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24, // router 1
             0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD, // router 2
             0x96e8ac4277198ff8b6f785478aa9a39f403cb768dd02cbee326c3e7da348845f // initial hash
         )
     {
-        token = msg.sender;
-
         _decimals = 9;
 
         minSegmentVoteCount = 1;
@@ -85,11 +82,11 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
     }
 
     function transfer(address to, uint256 value) internal {
-        IERC20(token).transfer(to, value);
+        IERC20(mainTokenAddress).transfer(to, value);
     }
 
     function getOptionIndex(uint256 value) internal view returns (uint256) {
-        uint256 MOD = 10**IJiggly(token).decimals();
+        uint256 MOD = 10**IJiggly(mainTokenAddress).decimals();
         uint256 decimalValue = value % MOD;
         uint256 insignifcant = MOD / 1000 - 1;
 
@@ -165,7 +162,7 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
         address to,
         uint256 value
     ) external returns (uint256) {
-        require(msg.sender == token);
+        require(msg.sender == mainTokenAddress);
 
         if (isUniswapLP(to)) {
             // tokens ---> pool | sell or add liquidity
@@ -231,7 +228,7 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
             ? 1
             : rewardPoolFeeFraction;
 
-        uint256 maxPoolSize = IERC20(token).balanceOf(address(this));
+        uint256 maxPoolSize = IERC20(mainTokenAddress).balanceOf(address(this));
 
         segmentPoolSize = previousContributionsVolume / rewardPoolFeeFraction >
             maxPoolSize
@@ -267,7 +264,7 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
     }
 
     function passProposal(Proposals proposal, address target) external {
-        require(msg.sender == token);
+        require(msg.sender == mainTokenAddress);
 
         if (proposal == Proposals.NEW_LP && target != BETA_TOKEN) {
             addLP(target);

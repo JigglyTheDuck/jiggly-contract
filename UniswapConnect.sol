@@ -6,15 +6,18 @@ contract UniswapConnect {
     address usRouter2;
     bytes32 usInitCodeHash;
     address usFactoryAddress;
+    address mainTokenAddress;
 
     mapping(address => bool) usLPs;
 
     constructor(
+        address tokenAddress,
         address uniswapFactoryAddress,
         address uniswapRouterAddress1,
         address uniswapRouterAddress2,
         bytes32 uniswapInitCodeHash
     ) {
+        mainTokenAddress = tokenAddress;
         usRouter1 = uniswapRouterAddress1;
         usRouter2 = uniswapRouterAddress2;
         usFactoryAddress = uniswapFactoryAddress;
@@ -26,10 +29,9 @@ contract UniswapConnect {
         view
         returns (address)
     {
-        address selfAddress = address(this);
-        (address token0, address token1) = selfAddress < tokenAddress
-            ? (selfAddress, tokenAddress)
-            : (tokenAddress, selfAddress);
+        (address token0, address token1) = mainTokenAddress < tokenAddress
+            ? (mainTokenAddress, tokenAddress)
+            : (tokenAddress, mainTokenAddress);
 
         bytes32 hash = keccak256(
             abi.encodePacked(
