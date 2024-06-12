@@ -6,6 +6,5 @@ pragma solidity ^0.8.13;
 import "./token/ERC20/IERC20.sol";
 
 interface IJiggly is IERC20 {
-    function decimals() external view returns (uint8);
     function passProposal(uint8 _proposal, address target) external;
 }

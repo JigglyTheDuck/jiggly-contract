@@ -29,9 +29,7 @@ contract DAO {
     }
 
     function newProposalRequirement() internal view returns (uint256) {
-        return
-            IERC20(owner).totalSupply() /
-            (THRESHOLD_FRACTION * 100); // requiring 0.1% to initiate a vote
+        return IERC20(owner).totalSupply() / (THRESHOLD_FRACTION * 100); // requiring 0.1% to initiate a vote
     }
 
     function getBalance() internal view returns (uint256) {

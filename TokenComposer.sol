@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
 import "./TimeTracker.sol";
 import "./WithComposer.sol";
-import "./IJiggly.sol";
 import "./UniswapConnect.sol";
 
 contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
@@ -16,7 +17,8 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
         CHANGE_FEE,
         CHANGE_SEGMENT_LENGTH,
         CHANGE_MIN_SEGMENT_VOTE,
-        CHANGE_ROUTER
+        CHANGE_ROUTER_1,
+        CHANGE_ROUTER_2
     }
 
     struct Contribution {
@@ -29,14 +31,14 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
 
     uint256[64] public optionVotes;
 
-    uint16 public segmentVoteCount = 0;
+    uint256 public segmentVoteCount;
 
     // to incentivize agreement
     uint256 public segmentPoolSize; // public as ongoing transactions may affect actual balance
 
     uint256 previousContributionsVolume;
 
-    uint256 previousOption;
+    uint256 previousOption; // to be able to determine whether contribution is to correct option
 
     uint160 minSegmentVoteCount;
 
@@ -47,11 +49,9 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
     event Segment(uint256 selectedOption);
     event Limit();
 
-    event DBG(uint test);
-
     mapping(address => Contribution) public contributions;
 
-    address constant BETA_TOKEN = 0xe53bF56F8E5BfC508A08cD2C375c0257044114F7; // BETA token
+    address constant BETA_TOKEN = 0x0356Ee6D5c0a53f43D1AC2022B3d5bA7acf7e697; // BETA token
     address constant LIVE_TOKEN = 0x4200000000000000000000000000000000000006; // WETH
 
     constructor()
@@ -66,9 +66,9 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
     {
         _decimals = 9;
 
-        minSegmentVoteCount = 1;
+        minSegmentVoteCount = 10;
 
-        initializeOptions(1000 gwei);
+        initializeOptions(3000 gwei);
 
         addLP(BETA_TOKEN);
 
@@ -81,12 +81,8 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
         return _decimals;
     }
 
-    function transfer(address to, uint256 value) internal {
-        IERC20(mainTokenAddress).transfer(to, value);
-    }
-
     function getOptionIndex(uint256 value) internal view returns (uint256) {
-        uint256 MOD = 10**IJiggly(mainTokenAddress).decimals();
+        uint256 MOD = 10**_decimals;
         uint256 decimalValue = value % MOD;
         uint256 insignifcant = MOD / 1000 - 1;
 
@@ -163,12 +159,12 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
         uint256 value
     ) external returns (uint256) {
         require(msg.sender == mainTokenAddress);
-
         if (isUniswapLP(to)) {
+            if (isUniswap(from)) return 0; // internal tx not important
             // tokens ---> pool | sell or add liquidity
 
             uint256 rewards = claimRewards(from);
-            if (rewards > 0) transfer(from, rewards);
+            if (rewards > 0) IERC20(mainTokenAddress).transfer(from, rewards);
 
             uint256 selectedOptionIndex = getOptionIndex(value);
 
@@ -184,10 +180,7 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
             segmentVoteCount >= minSegmentVoteCount
         ) proceedComposition();
 
-        return
-            isUniswap(from) && isUniswap(to)
-                ? 0 // don't tax internal transactions
-                : getRewardsPerTx(value);
+        return value / transferRewardPoolFeeFraction;
     }
 
     function addContribution(
@@ -208,15 +201,13 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
         return composer.getNextOptions();
     }
 
-    function getRewardsPerTx(uint256 value) internal view returns (uint256) {
-        return value / transferRewardPoolFeeFraction;
-    }
-
     function resetSegmentRewards(uint256 selectedOption)
         internal
         returns (uint256)
     {
+        previousOption = selectedOption;
         previousContributionsVolume = contributionVolumes[selectedOption];
+
         uint256 optionsLength = getNextOptions();
 
         // reset contributions
@@ -224,18 +215,11 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
 
         uint256 rewardPoolFeeFraction = transferRewardPoolFeeFraction / 5; // 5x the tax
 
-        rewardPoolFeeFraction = rewardPoolFeeFraction == 0
-            ? 1
-            : rewardPoolFeeFraction;
-
         uint256 maxPoolSize = IERC20(mainTokenAddress).balanceOf(address(this));
 
-        segmentPoolSize = previousContributionsVolume / rewardPoolFeeFraction >
-            maxPoolSize
-            ? maxPoolSize
-            : previousContributionsVolume / rewardPoolFeeFraction;
+        segmentPoolSize = previousContributionsVolume / rewardPoolFeeFraction;
 
-        previousOption = selectedOption;
+        if (segmentPoolSize > maxPoolSize) segmentPoolSize = maxPoolSize;
 
         return previousContributionsVolume;
     }
@@ -271,11 +255,13 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
         } else if (proposal == Proposals.REMOVE_LP) {
             removeLP(target);
         } else if (proposal == Proposals.ADJUST_DECIMALS) {
-            _decimals = target == address(1) && _decimals > 3
+            _decimals = target == address(0) && _decimals > 3
                 ? _decimals - 1
                 : _decimals + 1;
-        } else if (proposal == Proposals.CHANGE_ROUTER) {
+        } else if (proposal == Proposals.CHANGE_ROUTER_1) {
             usRouter1 = target;
+        } else if (proposal == Proposals.CHANGE_ROUTER_2) {
+            usRouter2 = target;
         } else if (proposal == Proposals.NEW_COMPOSER) {
             pendingComposerAddress = target;
         } else if (proposal == Proposals.CHANGE_FEE) {
@@ -290,4 +276,3 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
         }
     }
 }
-
