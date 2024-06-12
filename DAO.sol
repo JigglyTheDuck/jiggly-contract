@@ -44,7 +44,7 @@ contract DAO {
 
     function hasPassed(Proposal memory proposal) internal view returns (bool) {
         return
-            proposal.voteCount >
+            proposal.voteCount >=
             IERC20(owner).totalSupply() /
                 (
                     proposal.proposal < 3 // Major contract changes require more votes and take effect immediately

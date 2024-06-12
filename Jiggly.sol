@@ -1,5 +1,6 @@
+
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.13;
 
 import "./TokenComposer.sol";
 import "./ITokenComposer.sol";
@@ -25,7 +26,6 @@ contract Jiggly is ERC20, ERC20Permit {
         _mint(tokenComposer, 41000000 gwei);
 
         // 1M goes to LP with BETA token
-        // This liquidity will be pulled at the end of beta and put into the WETH pool
         _mint(msg.sender, 1000000 gwei);
     }
 
@@ -33,19 +33,25 @@ contract Jiggly is ERC20, ERC20Permit {
         return ITokenComposer(tokenComposer).decimals();
     }
 
-    function passProposal(Proposals proposal, address target) external {
+    function passProposal(uint8 _proposal, address target) external {
         require(msg.sender == dao);
+        uint8 max = uint8(type(Proposals).max);
+
+        if (_proposal > max) {
+            ITokenComposer(tokenComposer).passProposal(
+                _proposal - max - 1,
+                target
+            );
+          return;
+        }
+
+        Proposals proposal = Proposals(_proposal);
 
         if (proposal == Proposals.CHANGE_DAO) {
             dao = target;
         } else if (proposal == Proposals.CHANGE_COMPOSER) {
             _transfer(tokenComposer, target, balanceOf(tokenComposer));
             tokenComposer = target;
-        } else {
-            ITokenComposer(tokenComposer).passProposal(
-                uint8(proposal) - uint8(type(Proposals).max) - 1,
-                target
-            );
         }
     }
 
