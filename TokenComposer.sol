@@ -11,7 +11,7 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
     address token;
 
     enum Proposals {
-        ADJUST_DECIMALS,
+        ADJUST_DECIMALS, // 3
         NEW_COMPOSER,
         NEW_LP,
         REMOVE_LP,
@@ -48,6 +48,8 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
 
     event Segment(uint256 selectedOption);
     event Limit();
+
+    event DBG(uint test);
 
     mapping(address => Contribution) public contributions;
 
@@ -132,7 +134,7 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
         if (composer.applyOption(maxIndex)) {
             emit Limit();
 
-            if (isUniswapLP(BETA_TOKEN)) {
+            if (isUniswapLP(getLPAddress(BETA_TOKEN))) {
                 removeLP(BETA_TOKEN);
                 addLP(LIVE_TOKEN);
             } 
@@ -181,7 +183,7 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
         } else decreaseMaxAndRandomize(value); // any other trade will hurt the current MAX value, and move those votes to a random one
 
         if (
-            block.timestamp > lastTimestamp + segmentLength &&
+            block.timestamp >= lastTimestamp + segmentLength &&
             segmentVoteCount >= minSegmentVoteCount
         ) proceedComposition();
 
@@ -256,7 +258,7 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
 
         // BETA participants are rewarded 10x for all contributions
         // 5% of contribution volume
-        if (isUniswapLP(BETA_TOKEN)) rewards *= 10;
+        if (isUniswapLP(getLPAddress(BETA_TOKEN))) rewards *= 10;
 
         // reset to avoid reentry
         contribution.value = 0;
