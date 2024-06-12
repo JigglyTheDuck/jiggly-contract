@@ -7,8 +7,6 @@ import "./IJiggly.sol";
 contract DAO {
     uint256 constant THRESHOLD_FRACTION = 10; // 10% of total supply is required for a proposal to pass
 
-    address owner;
-
     struct Voter {
         address target;
         uint64 timestamp;
@@ -20,6 +18,7 @@ contract DAO {
         uint256 voteCount;
     }
 
+    address owner;
     mapping(address => Proposal) public proposals;
     mapping(address => Voter) votes;
 
@@ -30,7 +29,7 @@ contract DAO {
     }
 
     function newProposalRequirement() internal view returns (uint256) {
-        return IERC20(owner).totalSupply() / (THRESHOLD_FRACTION * 100); // requiring 1% of pass to initiate a vote
+        return IERC20(owner).totalSupply() / (THRESHOLD_FRACTION * 100); // requiring 0.1% to initiate a vote
     }
 
     function createProposal(address target, uint8 _proposal) external {
@@ -49,7 +48,7 @@ contract DAO {
             IERC20(owner).totalSupply() /
                 (
                     proposal.proposal < 3 // Major contract changes require more votes and take effect immediately
-                        ? THRESHOLD_FRACTION / 2 // 20% is required for major contract changes
+                        ? THRESHOLD_FRACTION / 2 // 20%
                         : THRESHOLD_FRACTION
                 );
     }

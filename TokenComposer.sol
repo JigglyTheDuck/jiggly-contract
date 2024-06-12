@@ -57,9 +57,9 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
     constructor()
         TimeTracker(30 minutes)
         UniswapConnect(
-            0x9e5A52f57b3038F1B8EeE45F28b3C1967e22799C, // factory
-            0xedf6066a2b290C185783862C7F4776A2C8077AD1, // router 1
-            0xec7BE89e9d109e7e3Fec59c222CF297125FEFda2, // router 2
+            0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6, // factory
+            0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24, // router 1
+            0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD, // router 2
             0x96e8ac4277198ff8b6f785478aa9a39f403cb768dd02cbee326c3e7da348845f // initial hash
         )
     {
@@ -73,9 +73,9 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
 
         addLP(BETA_TOKEN);
 
-        emit Limit();
-
         transferRewardPoolFeeFraction = 200;
+
+        emit Limit();
     }
 
     function decimals() external view returns (uint8) {
@@ -267,7 +267,7 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
     function passProposal(Proposals proposal, address target) external {
         require(msg.sender == token);
 
-        if (proposal == Proposals.NEW_LP) {
+        if (proposal == Proposals.NEW_LP && target != BETA_TOKEN) {
             addLP(target);
         } else if (proposal == Proposals.REMOVE_LP) {
             removeLP(target);
@@ -291,3 +291,4 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
         }
     }
 }
+
