@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.13;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+//import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "./token/ERC20/IERC20.sol";
 import "./IJiggly.sol";
 
 contract DAO {
@@ -29,9 +30,13 @@ contract DAO {
     }
 
     function newProposalRequirement() internal view returns (uint256) {
-        return IERC20(owner).totalSupply() / (THRESHOLD_FRACTION * 100); // requiring 0.1% to initiate a vote
+        return IERC20(owner).totalSupply() / (THRESHOLD_FRACTION * 2/* * 100*/); // requiring 0.1% to initiate a vote
     }
 
+    function getBalance() internal view returns(uint256) {
+      return IERC20(owner).balanceOf(address(this));
+    }
+    
     function createProposal(address target, uint8 _proposal) external {
         Proposal storage proposal = proposals[target];
         require(proposal.proposal == 0);
@@ -55,21 +60,22 @@ contract DAO {
 
     function vote(address target, uint256 amount) public {
         // a single vote must be less than that of the initial requirement
-        require(amount <= newProposalRequirement());
+        require(amount <= newProposalRequirement(), "a");
 
         Proposal storage proposal = proposals[target];
 
         Voter storage voter = votes[msg.sender];
 
-        require(proposal.proposal != 0);
+        require(proposal.proposal != 0, "b");
 
-        require(voter.lockedAmount == 0);
+        require(voter.lockedAmount == 0, "c");
 
         // requires external approval.
+        uint previousBalance = getBalance();
         IERC20(owner).transferFrom(msg.sender, address(this), amount);
 
         proposal.voteCount += amount;
-        voter.lockedAmount = amount;
+        voter.lockedAmount = getBalance() - previousBalance;
         voter.target = target;
         voter.timestamp = uint64(block.timestamp);
 
