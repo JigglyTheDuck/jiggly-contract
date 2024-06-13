@@ -15,7 +15,7 @@ contract DAO {
 
     struct Proposal {
         uint8 proposal;
-        uint256 voteCount;
+        uint248 voteCount;
     }
 
     address owner;
@@ -72,7 +72,7 @@ contract DAO {
         // requires external approval.
         IERC20(owner).transferFrom(msg.sender, address(this), amount);
 
-        proposal.voteCount += amount;
+        proposal.voteCount += uint248(amount);
         voter.lockedAmount = amount;
         voter.target = target;
         voter.timestamp = uint64(block.timestamp);
@@ -98,7 +98,7 @@ contract DAO {
 
         // if not passed yet, need to remove from current votes
         if (proposal.voteCount >= voter.lockedAmount)
-            proposal.voteCount -= voter.lockedAmount;
+            proposal.voteCount -= uint248(voter.lockedAmount);
 
         voter.lockedAmount = 0;
     }

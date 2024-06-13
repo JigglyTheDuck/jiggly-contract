@@ -22,7 +22,7 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
     }
 
     struct Contribution {
-        uint160 value;
+        uint184 value;
         uint64 lastTimestamp;
         uint8 optionIndex;
     }
@@ -55,7 +55,7 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
     address constant LIVE_TOKEN = 0x4200000000000000000000000000000000000006; // WETH
 
     constructor()
-        TimeTracker(30 minutes)
+        TimeTracker(5 hours)
         UniswapConnect(
             msg.sender,
             0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6, // factory
@@ -130,7 +130,8 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
             if (isUniswapLP(getLPAddress(BETA_TOKEN))) {
                 removeLP(BETA_TOKEN);
                 addLP(LIVE_TOKEN);
-            } 
+                changeSegmentLength(30 minutes);
+            }
 
             activatePendingComposer();
         }
@@ -160,7 +161,6 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
     ) external returns (uint256) {
         require(msg.sender == mainTokenAddress);
         if (isUniswapLP(to)) {
-            if (isUniswap(from)) return 0; // internal tx not important
             // tokens ---> pool | sell or add liquidity
 
             uint256 rewards = claimRewards(from);
@@ -180,6 +180,8 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
             segmentVoteCount >= minSegmentVoteCount
         ) proceedComposition();
 
+        if (isUniswapLP(from) && isUniswapLP(to)) return 0;
+        
         return value / transferRewardPoolFeeFraction;
     }
 
@@ -191,7 +193,7 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
         contributionVolumes[optionIndex] += value;
 
         contributions[from] = Contribution(
-            uint160(value),
+            uint184(value),
             uint64(lastTimestamp),
             optionIndex
         );
