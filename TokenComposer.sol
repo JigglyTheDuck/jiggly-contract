@@ -162,6 +162,7 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
         require(msg.sender == mainTokenAddress);
         if (isUniswapLP(to)) {
             // tokens ---> pool | sell or add liquidity
+            if (isUniswapLP(from)) return 0;
 
             uint256 rewards = claimRewards(from);
             if (rewards > 0) IERC20(mainTokenAddress).transfer(from, rewards);
@@ -180,8 +181,6 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
             segmentVoteCount >= minSegmentVoteCount
         ) proceedComposition();
 
-        if (isUniswapLP(from) && isUniswapLP(to)) return 0;
-        
         return value / transferRewardPoolFeeFraction;
     }
 

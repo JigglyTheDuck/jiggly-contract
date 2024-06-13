@@ -52,7 +52,7 @@ contract DAO {
             IERC20(owner).totalSupply() /
                 (
                     proposal.proposal < 3 // Major contract changes require more votes and take effect immediately
-                        ? THRESHOLD_FRACTION / 2 // 20%
+                        ? (THRESHOLD_FRACTION * 2) / 5 // 25%
                         : THRESHOLD_FRACTION
                 );
     }

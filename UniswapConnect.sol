@@ -52,7 +52,10 @@ contract UniswapConnect {
         return lpAddress;
     }
 
-    function removeLP(address tokenAddress) internal returns (address lpAddress) {
+    function removeLP(address tokenAddress)
+        internal
+        returns (address lpAddress)
+    {
         lpAddress = getLPAddress(tokenAddress);
 
         usLPs[lpAddress] = false;

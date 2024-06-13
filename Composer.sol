@@ -100,4 +100,3 @@ contract Composer is OwnedComposer {
         return false;
     }
 }
-
