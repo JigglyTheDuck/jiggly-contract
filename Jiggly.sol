@@ -23,10 +23,10 @@ contract Jiggly is ERC20, ERC20Permit {
 
         tokenComposer = address(new TokenComposer());
 
-        _mint(tokenComposer, 41000000 gwei);
+        _mint(tokenComposer, 40000000 gwei);
 
         // 1M goes to LP with BETA token
-        _mint(msg.sender, 1000000 gwei);
+        _mint(msg.sender, 2000000 gwei);
     }
 
     function decimals() public view override returns (uint8) {

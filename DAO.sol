@@ -23,6 +23,7 @@ contract DAO {
     mapping(address => Voter) votes;
 
     event ProposalPassed(uint8, address target);
+    event NewProposal(uint8, address);
 
     constructor() {
         owner = msg.sender;
@@ -44,6 +45,8 @@ contract DAO {
         proposal.voteCount = 0;
 
         vote(target, newProposalRequirement());
+
+        emit NewProposal(_proposal, target);
     }
 
     function hasPassed(Proposal memory proposal) internal view returns (bool) {
