@@ -42,7 +42,7 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
 
     uint256 previousOption; // to be able to determine whether contribution is to correct option
 
-    uint160 minSegmentVoteCount;
+    uint256 minSegmentVoteCount;
 
     uint256[64] contributionVolumes;
 
@@ -83,25 +83,25 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
         transferRewardPoolFeeFraction = 200;
 
         emit Limit();
-        
+
         // apply all previous changes
-        applyOption(0); 
+        applyOption(0);
         applyOption(14);
-        applyOption(3); 
-        applyOption(12); 
-        applyOption(6); 
-        applyOption(7); 
-        applyOption(1); 
-        applyOption(3); 
-        applyOption(2);          
-        applyOption(2);          
-        applyOption(5); 
-        applyOption(3); 
-        applyOption(7);         
-        applyOption(5); 
-        applyOption(0); 
-        applyOption(7); 
-        applyOption(5); 
+        applyOption(3);
+        applyOption(12);
+        applyOption(6);
+        applyOption(7);
+        applyOption(1);
+        applyOption(3);
+        applyOption(2);
+        applyOption(2);
+        applyOption(5);
+        applyOption(3);
+        applyOption(7);
+        applyOption(5);
+        applyOption(0);
+        applyOption(7);
+        applyOption(5);
     }
 
     function decimals() external view returns (uint8) {
@@ -146,14 +146,14 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
         return maxIndex;
     }
 
-    function applyOption(uint selectedOption) internal returns (bool) {
+    function applyOption(uint256 selectedOption) internal returns (bool) {
         emit Segment(selectedOption);
 
         return composer.applyOption(selectedOption);
     }
 
     function proceedComposition() internal {
-        uint maxIndex = getMaxOption();
+        uint256 maxIndex = getMaxOption();
 
         if (applyOption(maxIndex)) {
             emit Limit();
@@ -235,7 +235,7 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
                     uint64(lastTimestamp + segmentLength)
                 );
             }
-        } else randomizeOptions(value / 5);
+        } else randomizeOptions(value / 2);
 
         if (
             block.timestamp >= lastTimestamp + segmentLength &&
@@ -275,11 +275,13 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
         // reset contributions
         for (uint256 i = 0; i < optionsLength; ++i) contributionVolumes[i] = 0;
 
-        uint256 rewardPoolFeeFraction = transferRewardPoolFeeFraction / 5; // 5x the tax
-
         uint256 maxPoolSize = IERC20(mainTokenAddress).balanceOf(address(this));
 
-        segmentPoolSize = previousContributionsVolume / rewardPoolFeeFraction;
+        // 5 * Vv * P / S / T
+        segmentPoolSize =
+            (5 * maxPoolSize * previousContributionsVolume) /
+            (IERC20(mainTokenAddress).totalSupply() *
+                transferRewardPoolFeeFraction);
 
         if (segmentPoolSize > maxPoolSize) segmentPoolSize = maxPoolSize;
 
@@ -299,7 +301,7 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
         uint256 rewards = (segmentPoolSize * contribution.value) /
             previousContributionsVolume;
 
-        // BETA participants are rewarded 10% for all contributions
+        // BETA participants are rewarded more
         if (isUniswapLP(getLPAddress(BETA_TOKEN))) rewards *= 4;
 
         // reset to avoid reentry
@@ -333,7 +335,7 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
         } else if (proposal == Proposals.CHANGE_SEGMENT_LENGTH) {
             changeSegmentLength(uint64(uint160(target)));
         } else if (proposal == Proposals.CHANGE_MIN_SEGMENT_VOTE) {
-            minSegmentVoteCount = uint160(target);
+            minSegmentVoteCount = uint256(uint160(target));
         }
     }
 }
