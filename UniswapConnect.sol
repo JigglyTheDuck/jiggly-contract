@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import "./IUniswapRouter.sol";
+
 contract UniswapConnect {
     address usRouter1;
     address usRouter2;
@@ -58,6 +60,17 @@ contract UniswapConnect {
         emit NewLP(tokenAddress, lpAddress);
 
         return lpAddress;
+    }
+
+    function getAmountsOut(uint256 amountsIn, address lpAddress)
+        internal view
+        returns (uint256)
+    {
+        address[] memory path = new address[](2);
+        path[0] = mainTokenAddress;
+        path[1] = usLPs[lpAddress];
+
+        return IUniswapRouter(usRouter1).getAmountsOut(amountsIn, path)[1];
     }
 
     function removeLP(address tokenAddress)

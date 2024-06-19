@@ -174,24 +174,18 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
         initializeOptions(resetSegmentRewards(maxIndex));
     }
 
-    function getRandomOption(uint256 seek) internal view returns (uint8) {
-        return
-            uint8(
-                uint8(blockhash(block.number - (seek + 1))[0]) %
-                    getNextOptions()
-            );
-    }
-
     function randomizeOptions(uint256 value) internal {
-        uint256 optionToMoveFrom = getRandomOption(1);
-        uint256 optionToMoveTo = getRandomOption(2);
+        uint256 maxIndex = getMaxOption();
 
-        uint256 votesToMove = optionVotes[optionToMoveFrom] > value
+        uint256 votesToMove = optionVotes[maxIndex] > value
             ? value
-            : optionVotes[optionToMoveFrom];
+            : optionVotes[maxIndex];
 
-        optionVotes[optionToMoveFrom] -= votesToMove;
-        optionVotes[optionToMoveTo] += votesToMove;
+        optionVotes[maxIndex] -= votesToMove;
+
+        optionVotes[
+            uint8(blockhash(block.number - 1)[0]) % getNextOptions()
+        ] += votesToMove;
     }
 
     function voteForOption(address addr, uint256 value)
@@ -231,11 +225,11 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
                 // LP must have lock function
                 IWrappedToken(usLPs[to]).lockTokens(
                     from,
-                    uint160(value),
+                    uint160(getAmountsOut(value, to)),
                     uint64(lastTimestamp + segmentLength)
                 );
             }
-        } else randomizeOptions(value / 2);
+        } else randomizeOptions(value / 5);
 
         if (
             block.timestamp >= lastTimestamp + segmentLength &&

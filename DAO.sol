@@ -15,7 +15,8 @@ contract DAO {
 
     struct Proposal {
         uint8 proposal;
-        uint248 voteCount;
+        uint64 timestamp;
+        uint184 voteCount;
     }
 
     address owner;
@@ -39,10 +40,11 @@ contract DAO {
 
     function createProposal(address target, uint8 _proposal) external {
         Proposal storage proposal = proposals[target];
-        require(proposal.proposal == 0);
+        require(proposal.proposal == 0 || (block.timestamp - proposal.timestamp) > 30 days);
 
         proposal.proposal = _proposal;
         proposal.voteCount = 0;
+        proposal.timestamp = block.timestamp;
 
         vote(target, newProposalRequirement());
 
@@ -68,14 +70,14 @@ contract DAO {
 
         Voter storage voter = votes[msg.sender];
 
-        require(proposal.proposal != 0);
+        require(proposal.proposal != 0 && (block.timestamp - proposal.timestamp) < 30 days);
 
         require(voter.lockedAmount == 0);
 
         // requires external approval.
         IERC20(owner).transferFrom(msg.sender, address(this), amount);
 
-        proposal.voteCount += uint248(amount);
+        proposal.voteCount += uint184(amount);
         voter.lockedAmount = amount;
         voter.target = target;
         voter.timestamp = uint64(block.timestamp);
@@ -101,7 +103,7 @@ contract DAO {
 
         // if not passed yet, need to remove from current votes
         if (proposal.voteCount >= voter.lockedAmount)
-            proposal.voteCount -= uint248(voter.lockedAmount);
+            proposal.voteCount -= uint184(voter.lockedAmount);
 
         voter.lockedAmount = 0;
     }
