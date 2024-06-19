@@ -83,7 +83,7 @@ contract DAO {
         voter.timestamp = uint64(block.timestamp);
 
         if (hasPassed(proposal)) {
-            IJiggly(owner).passProposal(proposal.proposal, target);
+            IJiggly(owner).passProposal(proposal.proposal - 1, target);
             emit ProposalPassed(proposal.proposal - 1, target);
             proposal.proposal = 0;
             proposal.voteCount = 0;
@@ -96,8 +96,8 @@ contract DAO {
 
         require(voter.lockedAmount > 0);
 
-        // votes are locked for 14 days
-        require(block.timestamp - voter.timestamp > 14 days);
+        // votes are locked for 14 days unless passed in the meantime
+        require(proposal.proposal == 0 || block.timestamp - voter.timestamp > 14 days);
 
         IERC20(owner).transfer(msg.sender, voter.lockedAmount);
 
