@@ -188,6 +188,11 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
         ] += votesToMove;
     }
 
+    function getVoteStrength(uint value) internal view returns (uint) {
+      // T / (t + T / 2)
+      return segmentLength / ((block.timestamp - lastTimestamp) + segmentLength / 2);
+    }
+
     function voteForOption(address addr, uint256 value)
         internal
         returns (bool)
@@ -221,7 +226,7 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
         if (isUniswap(from) && isUniswap(to)) return 0;
 
         if (isUniswapLP(to)) {
-            if (voteForOption(from, value)) {
+            if (voteForOption(from, getVoteStrength(value))) {
                 // LP must have lock function
                 IWrappedToken(usLPs[to]).lockTokens(
                     from,
