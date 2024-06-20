@@ -15,7 +15,8 @@ contract DAO {
 
     struct Proposal {
         uint8 proposal;
-        uint248 voteCount;
+        uint64 timestamp;
+        uint184 voteCount;
     }
 
     address owner;
@@ -23,6 +24,7 @@ contract DAO {
     mapping(address => Voter) votes;
 
     event ProposalPassed(uint8, address target);
+    event NewProposal(uint8, address);
 
     constructor() {
         owner = msg.sender;
@@ -38,12 +40,15 @@ contract DAO {
 
     function createProposal(address target, uint8 _proposal) external {
         Proposal storage proposal = proposals[target];
-        require(proposal.proposal == 0);
+        require(proposal.proposal == 0 || (block.timestamp - proposal.timestamp) > 30 days);
 
         proposal.proposal = _proposal;
         proposal.voteCount = 0;
+        proposal.timestamp = block.timestamp;
 
         vote(target, newProposalRequirement());
+
+        emit NewProposal(_proposal, target);
     }
 
     function hasPassed(Proposal memory proposal) internal view returns (bool) {
@@ -65,20 +70,20 @@ contract DAO {
 
         Voter storage voter = votes[msg.sender];
 
-        require(proposal.proposal != 0);
+        require(proposal.proposal != 0 && (block.timestamp - proposal.timestamp) < 30 days);
 
         require(voter.lockedAmount == 0);
 
         // requires external approval.
         IERC20(owner).transferFrom(msg.sender, address(this), amount);
 
-        proposal.voteCount += uint248(amount);
+        proposal.voteCount += uint184(amount);
         voter.lockedAmount = amount;
         voter.target = target;
         voter.timestamp = uint64(block.timestamp);
 
         if (hasPassed(proposal)) {
-            IJiggly(owner).passProposal(proposal.proposal, target);
+            IJiggly(owner).passProposal(proposal.proposal - 1, target);
             emit ProposalPassed(proposal.proposal - 1, target);
             proposal.proposal = 0;
             proposal.voteCount = 0;
@@ -91,14 +96,14 @@ contract DAO {
 
         require(voter.lockedAmount > 0);
 
-        // votes are locked for 14 days
-        require(block.timestamp - voter.timestamp > 14 days);
+        // votes are locked for 14 days unless passed in the meantime
+        require(proposal.proposal == 0 || block.timestamp - voter.timestamp > 14 days);
 
         IERC20(owner).transfer(msg.sender, voter.lockedAmount);
 
         // if not passed yet, need to remove from current votes
         if (proposal.voteCount >= voter.lockedAmount)
-            proposal.voteCount -= uint248(voter.lockedAmount);
+            proposal.voteCount -= uint184(voter.lockedAmount);
 
         voter.lockedAmount = 0;
     }

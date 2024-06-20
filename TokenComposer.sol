@@ -6,9 +6,11 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./TimeTracker.sol";
 import "./WithComposer.sol";
 import "./UniswapConnect.sol";
+import "./IWrappedToken.sol";
+import "./WrappedEther.sol";
+import "./WrappedERC20.sol";
 
 contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
-
     enum Proposals {
         ADJUST_DECIMALS, // 3
         NEW_COMPOSER,
@@ -40,7 +42,7 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
 
     uint256 previousOption; // to be able to determine whether contribution is to correct option
 
-    uint160 minSegmentVoteCount;
+    uint256 minSegmentVoteCount;
 
     uint256[64] contributionVolumes;
 
@@ -51,11 +53,11 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
 
     mapping(address => Contribution) public contributions;
 
-    address constant BETA_TOKEN = 0x0356Ee6D5c0a53f43D1AC2022B3d5bA7acf7e697; // BETA token
-    address constant LIVE_TOKEN = 0x4200000000000000000000000000000000000006; // WETH
+    address BETA_TOKEN;
+    address LIVE_TOKEN;
 
     constructor()
-        TimeTracker(5 hours)
+        TimeTracker(150 minutes)
         UniswapConnect(
             msg.sender,
             0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6, // factory
@@ -70,11 +72,36 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
 
         initializeOptions(3000 gwei);
 
+        LIVE_TOKEN = address(new WrappedEther());
+
+        BETA_TOKEN = address(
+            new WrappedERC20(0x0356Ee6D5c0a53f43D1AC2022B3d5bA7acf7e697)
+        );
+
         addLP(BETA_TOKEN);
 
         transferRewardPoolFeeFraction = 200;
 
         emit Limit();
+
+        // apply all previous changes
+        applyOption(0);
+        applyOption(14);
+        applyOption(3);
+        applyOption(12);
+        applyOption(6);
+        applyOption(7);
+        applyOption(1);
+        applyOption(3);
+        applyOption(2);
+        applyOption(2);
+        applyOption(5);
+        applyOption(3);
+        applyOption(7);
+        applyOption(5);
+        applyOption(0);
+        applyOption(7);
+        applyOption(5);
     }
 
     function decimals() external view returns (uint8) {
@@ -119,12 +146,16 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
         return maxIndex;
     }
 
+    function applyOption(uint256 selectedOption) internal returns (bool) {
+        emit Segment(selectedOption);
+
+        return composer.applyOption(selectedOption);
+    }
+
     function proceedComposition() internal {
         uint256 maxIndex = getMaxOption();
 
-        emit Segment(maxIndex);
-
-        if (composer.applyOption(maxIndex)) {
+        if (applyOption(maxIndex)) {
             emit Limit();
 
             if (isUniswapLP(getLPAddress(BETA_TOKEN))) {
@@ -143,15 +174,46 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
         initializeOptions(resetSegmentRewards(maxIndex));
     }
 
-    function decreaseMaxAndRandomize(uint256 value) internal {
+    function randomizeOptions(uint256 value) internal {
         uint256 maxIndex = getMaxOption();
+
         uint256 votesToMove = optionVotes[maxIndex] > value
             ? value
             : optionVotes[maxIndex];
+
         optionVotes[maxIndex] -= votesToMove;
+
         optionVotes[
             uint8(blockhash(block.number - 1)[0]) % getNextOptions()
         ] += votesToMove;
+    }
+
+    function getVoteStrength(uint value) internal view returns (uint) {
+      // T / (t + T / 2)
+      return segmentLength / ((block.timestamp - lastTimestamp) + segmentLength / 2);
+    }
+
+    function voteForOption(address addr, uint256 value)
+        internal
+        returns (bool)
+    {
+        uint256 rewards = claimRewards(addr);
+        if (rewards > 0) IERC20(mainTokenAddress).transfer(addr, rewards);
+
+        uint256 selectedOptionIndex = getOptionIndex(value);
+
+        if (selectedOptionIndex == 0xff) randomizeOptions(value);
+        else {
+            segmentVoteCount += 1;
+
+            addContribution(addr, uint8(selectedOptionIndex), value);
+
+            optionVotes[selectedOptionIndex] += value;
+
+            return true;
+        }
+
+        return false;
     }
 
     function composeAndGetRewardContribution(
@@ -160,21 +222,19 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
         uint256 value
     ) external returns (uint256) {
         require(msg.sender == mainTokenAddress);
+
+        if (isUniswap(from) && isUniswap(to)) return 0;
+
         if (isUniswapLP(to)) {
-            // tokens ---> pool | sell or add liquidity
-            if (isUniswapLP(from)) return 0;
-
-            uint256 rewards = claimRewards(from);
-            if (rewards > 0) IERC20(mainTokenAddress).transfer(from, rewards);
-
-            uint256 selectedOptionIndex = getOptionIndex(value);
-
-            if (selectedOptionIndex != 0xff) {
-                segmentVoteCount += 1;
-                addContribution(from, uint8(selectedOptionIndex), value);
-                optionVotes[selectedOptionIndex] += value;
-            } else decreaseMaxAndRandomize(value); // no valid option selected, decreasing current MAX.
-        } else decreaseMaxAndRandomize(value); // any other trade will hurt the current MAX value, and move those votes to a random one
+            if (voteForOption(from, getVoteStrength(value))) {
+                // LP must have lock function
+                IWrappedToken(usLPs[to]).lockTokens(
+                    from,
+                    uint160(getAmountsOut(value, to)),
+                    uint64(lastTimestamp + segmentLength)
+                );
+            }
+        } else randomizeOptions(value / 5);
 
         if (
             block.timestamp >= lastTimestamp + segmentLength &&
@@ -214,11 +274,13 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
         // reset contributions
         for (uint256 i = 0; i < optionsLength; ++i) contributionVolumes[i] = 0;
 
-        uint256 rewardPoolFeeFraction = transferRewardPoolFeeFraction / 5; // 5x the tax
-
         uint256 maxPoolSize = IERC20(mainTokenAddress).balanceOf(address(this));
 
-        segmentPoolSize = previousContributionsVolume / rewardPoolFeeFraction;
+        // 5 * Vv * P / S / T
+        segmentPoolSize =
+            (5 * maxPoolSize * previousContributionsVolume) /
+            (IERC20(mainTokenAddress).totalSupply() *
+                transferRewardPoolFeeFraction);
 
         if (segmentPoolSize > maxPoolSize) segmentPoolSize = maxPoolSize;
 
@@ -238,9 +300,8 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
         uint256 rewards = (segmentPoolSize * contribution.value) /
             previousContributionsVolume;
 
-        // BETA participants are rewarded 10x for all contributions
-        // 5% of contribution volume
-        if (isUniswapLP(getLPAddress(BETA_TOKEN))) rewards *= 10;
+        // BETA participants are rewarded more
+        if (isUniswapLP(getLPAddress(BETA_TOKEN))) rewards *= 4;
 
         // reset to avoid reentry
         contribution.value = 0;
@@ -273,7 +334,8 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
         } else if (proposal == Proposals.CHANGE_SEGMENT_LENGTH) {
             changeSegmentLength(uint64(uint160(target)));
         } else if (proposal == Proposals.CHANGE_MIN_SEGMENT_VOTE) {
-            minSegmentVoteCount = uint160(target);
+            minSegmentVoteCount = uint256(uint160(target));
         }
     }
 }
+
