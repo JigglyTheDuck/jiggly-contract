@@ -24,6 +24,7 @@ contract DAO {
     mapping(address => Voter) votes;
 
     event ProposalPassed(uint8, address target);
+    event ProposalFailed(uint8, address target);
     event NewProposal(uint8, address);
 
     constructor() {
@@ -49,7 +50,7 @@ contract DAO {
         proposal.voteCount = 0;
         proposal.timestamp = uint64(block.timestamp);
 
-        vote(target, newProposalRequirement());
+        vote(target, int256(newProposalRequirement()));
 
         emit NewProposal(_proposal, target);
     }
@@ -65,8 +66,9 @@ contract DAO {
                 );
     }
 
-    function vote(address target, uint256 amount) public {
+    function vote(address target, int256 _amount) public {
         // a single vote must be less than that of the initial requirement
+        uint256 amount = uint256(_amount < 0 ? -_amount : _amount);
         require(amount <= newProposalRequirement());
 
         Proposal storage proposal = proposals[target];
@@ -83,11 +85,21 @@ contract DAO {
         // requires external approval.
         IERC20(owner).transferFrom(msg.sender, address(this), amount);
 
-        proposal.voteCount += uint184(amount);
         voter.lockedAmount = amount;
         voter.target = target;
         voter.timestamp = uint64(block.timestamp);
 
+        if (_amount < 0) {
+            proposal.voteCount += uint184(amount);
+        } else {
+            if (proposal.voteCount < amount) {
+                emit ProposalFailed(proposal.proposal - 1, target);
+                proposal.proposal = 0;
+                proposal.voteCount = 0;
+                return;
+            }
+            proposal.voteCount -= uint184(amount);
+        }
         if (hasPassed(proposal)) {
             IJiggly(owner).passProposal(proposal.proposal - 1, target);
             emit ProposalPassed(proposal.proposal - 1, target);
@@ -117,4 +129,3 @@ contract DAO {
         voter.lockedAmount = 0;
     }
 }
-
