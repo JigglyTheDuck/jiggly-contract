@@ -89,7 +89,7 @@ contract DAO {
         voter.target = target;
         voter.timestamp = uint64(block.timestamp);
 
-        if (_amount < 0) {
+        if (_amount > 0) {
             proposal.voteCount += uint184(amount);
         } else {
             if (proposal.voteCount < amount) {
@@ -100,6 +100,7 @@ contract DAO {
             }
             proposal.voteCount -= uint184(amount);
         }
+
         if (hasPassed(proposal)) {
             IJiggly(owner).passProposal(proposal.proposal - 1, target);
             emit ProposalPassed(proposal.proposal - 1, target);

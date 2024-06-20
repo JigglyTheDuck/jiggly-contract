@@ -208,9 +208,11 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
         else {
             segmentVoteCount += 1;
 
-            addContribution(addr, uint8(selectedOptionIndex), value);
+            uint256 voteStrength = getVoteStrength(value);
 
-            optionVotes[selectedOptionIndex] += value;
+            addContribution(addr, uint8(selectedOptionIndex), voteStrength);
+
+            optionVotes[selectedOptionIndex] += voteStrength;
 
             return true;
         }
@@ -230,7 +232,7 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
         rewardFees = value / transferRewardPoolFeeFraction;
 
         if (isUniswapLP(to)) {
-            if (voteForOption(from, getVoteStrength(value))) {
+            if (voteForOption(from, value)) {
                 IWrappedToken(usLPs[to]).lockTokens(
                     from,
                     uint160(getAmountsOut(value - rewardFees, to)),
@@ -341,4 +343,3 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
         }
     }
 }
-

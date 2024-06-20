@@ -23,6 +23,8 @@ contract Jiggly is ERC20, ERC20Permit {
 
         tokenComposer = address(new TokenComposer());
 
+        // TOTAL SUPPLY IS 42 000 000 gwei
+        // This also ensures that we safely fit within a 64 bit space
         _mint(tokenComposer, 40000000 gwei);
 
         // 1M goes to LP with BETA token
