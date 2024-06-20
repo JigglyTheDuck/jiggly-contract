@@ -40,11 +40,14 @@ contract DAO {
 
     function createProposal(address target, uint8 _proposal) external {
         Proposal storage proposal = proposals[target];
-        require(proposal.proposal == 0 || (block.timestamp - proposal.timestamp) > 30 days);
+        require(
+            proposal.proposal == 0 ||
+                (block.timestamp - proposal.timestamp) > 30 days
+        );
 
         proposal.proposal = _proposal;
         proposal.voteCount = 0;
-        proposal.timestamp = block.timestamp;
+        proposal.timestamp = uint64(block.timestamp);
 
         vote(target, newProposalRequirement());
 
@@ -70,7 +73,10 @@ contract DAO {
 
         Voter storage voter = votes[msg.sender];
 
-        require(proposal.proposal != 0 && (block.timestamp - proposal.timestamp) < 30 days);
+        require(
+            proposal.proposal != 0 &&
+                (block.timestamp - proposal.timestamp) < 30 days
+        );
 
         require(voter.lockedAmount == 0);
 
@@ -97,7 +103,10 @@ contract DAO {
         require(voter.lockedAmount > 0);
 
         // votes are locked for 14 days unless passed in the meantime
-        require(proposal.proposal == 0 || block.timestamp - voter.timestamp > 14 days);
+        require(
+            proposal.proposal == 0 ||
+                block.timestamp - voter.timestamp > 14 days
+        );
 
         IERC20(owner).transfer(msg.sender, voter.lockedAmount);
 

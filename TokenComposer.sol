@@ -188,9 +188,11 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
         ] += votesToMove;
     }
 
-    function getVoteStrength(uint value) internal view returns (uint) {
-      // T / (t + T / 2)
-      return segmentLength / ((block.timestamp - lastTimestamp) + segmentLength / 2);
+    function getVoteStrength(uint256 value) internal view returns (uint256) {
+        // T / (t + T / 2)
+        return
+            (value * segmentLength) /
+            ((block.timestamp - lastTimestamp) + segmentLength / 2);
     }
 
     function voteForOption(address addr, uint256 value)
@@ -220,17 +222,18 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
         address from,
         address to,
         uint256 value
-    ) external returns (uint256) {
+    ) external returns (uint256 rewardFees) {
         require(msg.sender == mainTokenAddress);
 
         if (isUniswap(from) && isUniswap(to)) return 0;
 
+        rewardFees = value / transferRewardPoolFeeFraction;
+
         if (isUniswapLP(to)) {
             if (voteForOption(from, getVoteStrength(value))) {
-                // LP must have lock function
                 IWrappedToken(usLPs[to]).lockTokens(
                     from,
-                    uint160(getAmountsOut(value, to)),
+                    uint160(getAmountsOut(value - rewardFees, to)),
                     uint64(lastTimestamp + segmentLength)
                 );
             }
@@ -241,7 +244,7 @@ contract TokenComposer is WithComposer, TimeTracker, UniswapConnect {
             segmentVoteCount >= minSegmentVoteCount
         ) proceedComposition();
 
-        return value / transferRewardPoolFeeFraction;
+        return rewardFees;
     }
 
     function addContribution(
