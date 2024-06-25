@@ -23,9 +23,7 @@ contract Jiggly is ERC20, ERC20Permit {
 
         tokenComposer = address(new TokenComposer());
 
-        _mint(tokenComposer, 41000000 gwei);
-
-        // 1M goes to LP with BETA token
+        _mint(tokenComposer, 1000000 gwei);
         _mint(msg.sender, 1000000 gwei);
     }
 
@@ -67,7 +65,7 @@ contract Jiggly is ERC20, ERC20Permit {
         }
 
         uint256 toRewardPool = ITokenComposer(tokenComposer)
-            .composeAndGetRewardContribution(from, to, value);
+            .compose(from, to, value);
 
         _transfer(from, to, value - toRewardPool);
 

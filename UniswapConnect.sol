@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import "./IUniswapFactory.sol";
+
 contract UniswapConnect {
     address usRouter1;
     address usRouter2;
@@ -34,19 +36,7 @@ contract UniswapConnect {
     {
         if (usLPs[tokenAddress] != address(0)) return usLPs[tokenAddress];
 
-        (address token0, address token1) = mainTokenAddress < tokenAddress
-            ? (mainTokenAddress, tokenAddress)
-            : (tokenAddress, mainTokenAddress);
-
-        bytes32 hash = keccak256(
-            abi.encodePacked(
-                hex"ff",
-                usFactoryAddress,
-                keccak256(abi.encodePacked(token0, token1)),
-                usInitCodeHash
-            )
-        );
-        return address(uint160(uint256(hash)));
+        return IUniswapFactory(usFactoryAddress).getPair(mainTokenAddress, tokenAddress);
     }
 
     function addLP(address tokenAddress) internal returns (address lpAddress) {

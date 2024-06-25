@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-contract TimeTracker {
+contract Clock {
     uint64 segmentLength;
     uint256 lastTimestamp;
 
@@ -14,7 +14,12 @@ contract TimeTracker {
         segmentLength = newLength;
     }
 
-    function progressTime() internal {
-        lastTimestamp += segmentLength;
+    function progressTime() internal returns (bool) {
+        if ((block.timestamp - lastTimestamp) > segmentLength) {
+          block.timestamp += segmentLength;
+          return true;
+        }
+
+        return false;
     }
 }

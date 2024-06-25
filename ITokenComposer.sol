@@ -6,7 +6,7 @@ interface ITokenComposer {
 
     function decimals() external view returns(uint8);
     
-    function composeAndGetRewardContribution(
+    function compose(
         address from,
         address to,
         uint256 value
